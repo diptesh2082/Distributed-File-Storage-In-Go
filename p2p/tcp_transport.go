@@ -12,15 +12,20 @@ type TCPPeer struct {
 }
 
 // // Add a String method to TCPPeer
-// func (p *TCPPeer) String() string {
-// 	return p.conn.RemoteAddr().String() // This will print the remote address of the connection
-// }
-
+//
+//	func (p *TCPPeer) String() string {
+//		return p.conn.RemoteAddr().String() // This will print the remote address of the connection
+//	}
+type TCPTransportOpts struct {
+	ListnerAdder  string
+	HandShakeFunc HandShakeFunc
+	Decoder       Decoder
+}
 type TCPTransport struct {
-	listnerAdder string
-	listner      net.Listener
-	mu           sync.RWMutex
-	peers        map[net.Addr]Peer
+	TCPTransportOpts
+	listner net.Listener
+	mu      sync.RWMutex
+	peers   map[net.Addr]Peer
 }
 
 func NewTCPPeer(conn net.Conn, outbount bool) *TCPPeer {
@@ -31,21 +36,24 @@ func NewTCPPeer(conn net.Conn, outbount bool) *TCPPeer {
 	}
 }
 
+// type Temp struct{}
+
 // NewTCPTransport creates a new TCPTransport instance.
-func NewTCPTransport(listnerAddr string) *TCPTransport {
+func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 
 	return &TCPTransport{
-		listnerAdder: listnerAddr,
-		peers:        make(map[net.Addr]Peer),
-		mu:           sync.RWMutex{},
+		TCPTransportOpts: opts,
+		peers:            make(map[net.Addr]Peer),
+		mu:               sync.RWMutex{},
 	}
 }
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
-	t.listner, err = net.Listen("tcp", t.listnerAdder)
+	t.listner, err = net.Listen("tcp", t.ListnerAdder)
 	if err != nil {
 		return err
 	}
+
 	fmt.Printf("Listening on %v\n", t.listner.Addr())
 	go t.StartAcceptingLoop()
 	return nil
@@ -60,6 +68,9 @@ func (t *TCPTransport) StartAcceptingLoop() error {
 			fmt.Printf("TCP accept error: %s\n", err)
 			// return err
 		}
+		// if err = t.HandShakeFunc(conn) ; err != nil{
+
+		// }
 		// fmt.Println("Accepted a new connection")
 		go t.HandleConnection(conn)
 
@@ -68,4 +79,20 @@ func (t *TCPTransport) StartAcceptingLoop() error {
 func (t *TCPTransport) HandleConnection(conn net.Conn) {
 	peer := NewTCPPeer(conn, true)
 	fmt.Printf("New incoming connection from %v\n", peer)
+
+	if err := t.HandShakeFunc(conn); err != nil {
+		fmt.Printf("Handshake error for connection from %v: %s\n", peer.conn.LocalAddr(), err)
+		conn.Close()
+		return
+	}
+	rpc := &RPC{}
+	for {
+		if err := t.Decoder.Decode(conn, rpc); err != nil {
+			fmt.Printf("Error decoding message from %v: %s\n", peer.conn.LocalAddr(), err)
+			// conn.Close()
+			continue
+		}
+		rpc.From = conn.RemoteAddr()
+		fmt.Printf("message :: %v\n", rpc)
+	}
 }

@@ -8,8 +8,13 @@ import (
 )
 
 func main() {
+	tcpopts := p2p.TCPTransportOpts{
+		ListnerAdder:  ":4000",
+		HandShakeFunc: p2p.NOPHandShake,
+		Decoder:       &p2p.DefaultDecoder{},
+	}
 	// Create a new TCP transport instance
-	tr := p2p.NewTCPTransport(":3000")
+	tr := p2p.NewTCPTransport(tcpopts)
 
 	// Start listening and accepting connections
 	err := tr.ListenAndAccept()
