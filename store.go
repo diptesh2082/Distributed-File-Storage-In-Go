@@ -91,6 +91,10 @@ func (s *Store) Exists(key string) (bool, error) {
 	return true, nil
 }
 
+func (s *Store) Clear(key string) error {
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) Delete(key string) error {
 	pathkey := s.PathTransFormFunc(key)
 	defer func() {
