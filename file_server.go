@@ -66,7 +66,7 @@ func (s *Server) BroadcastData(p *Payload) error {
 	}
 	mw := io.MultiWriter(peers...)
 	fmt.Println("Broadcasting to", len(peers), "peers:", p)
-	return gob.NewEncoder(mw).Encode(p)
+	return gob.NewEncoder(mw).Encode(p.data)
 }
 
 func (s *Server) StoreData(key string, r io.Reader) error {
