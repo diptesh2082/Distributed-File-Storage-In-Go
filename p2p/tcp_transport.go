@@ -20,12 +20,14 @@ type TCPTransportOpts struct {
 	ListnerAdder  string
 	HandShakeFunc HandShakeFunc
 	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
 type TCPTransport struct {
 	TCPTransportOpts
 	listner net.Listener
 	mu      sync.RWMutex
-	peers   map[net.Addr]Peer
+	rpcch   chan RPC
+	// peers   map[net.Addr]Peer
 }
 
 func NewTCPPeer(conn net.Conn, outbount bool) *TCPPeer {
@@ -43,10 +45,20 @@ func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		peers:            make(map[net.Addr]Peer),
-		mu:               sync.RWMutex{},
+		// peers:            make(map[net.Addr]Peer),
+		mu:    sync.RWMutex{},
+		rpcch: make(chan RPC, 1018),
 	}
 }
+
+func (t *TCPTransport) Consume() <-chan RPC {
+	return t.rpcch
+}
+
+func (p *TCPPeer) Close() error {
+	return p.conn.Close()
+}
+
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listner, err = net.Listen("tcp", t.ListnerAdder)
@@ -77,13 +89,25 @@ func (t *TCPTransport) StartAcceptingLoop() error {
 	}
 }
 func (t *TCPTransport) HandleConnection(conn net.Conn) {
+	var err error
 	peer := NewTCPPeer(conn, true)
 	fmt.Printf("New incoming connection from %v\n", peer)
+
+	defer func() {
+		fmt.Printf("dropping peer connection: %s", err)
+		conn.Close()
+	}()
 
 	if err := t.HandShakeFunc(conn); err != nil {
 		fmt.Printf("Handshake error for connection from %v: %s\n", peer.conn.LocalAddr(), err)
 		conn.Close()
 		return
+	}
+
+	if t.OnPeer != nil {
+		if err := t.OnPeer(peer); err != nil {
+			return
+		}
 	}
 	rpc := &RPC{}
 	for {
@@ -94,5 +118,6 @@ func (t *TCPTransport) HandleConnection(conn net.Conn) {
 		}
 		rpc.From = conn.RemoteAddr()
 		fmt.Printf("message :: %v\n", rpc)
+		t.rpcch <- *rpc
 	}
 }
