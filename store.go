@@ -116,6 +116,9 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 	return buf, err
 }
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
+}
 
 func (s *Store) readStream(key string) (*os.File, error) {
 	PathKey := s.PathTransFormFunc(key)
@@ -123,7 +126,7 @@ func (s *Store) readStream(key string) (*os.File, error) {
 	return os.Open(fullPathAndFileNameWithRoot)
 }
 
-func (s *Store) WriteStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) error {
 	pathkey := s.PathTransFormFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {

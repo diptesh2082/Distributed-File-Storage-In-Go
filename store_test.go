@@ -28,7 +28,7 @@ func TestCASPathTransFormFunc(t *testing.T) {
 
 // 	key := "mypicture"
 // 	data := []byte("some image in byte")
-// 	if err := s.WriteStream(key, bytes.NewReader(data)); err != nil {
+// 	if err := s.Write(key, bytes.NewReader(data)); err != nil {
 // 		t.Error(err)
 // 	}
 
@@ -52,7 +52,7 @@ func TestStore(t *testing.T) {
 	for i := 0; i <= 50; i++ {
 		key := "Dx" + fmt.Sprint(i)
 		data := []byte("some image in byte")
-		if err := s.WriteStream(key, bytes.NewReader(data)); err != nil {
+		if err := s.Write(key, bytes.NewReader(data)); err != nil {
 			t.Error(err)
 		}
 
