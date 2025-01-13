@@ -8,7 +8,7 @@ import (
 )
 
 type TCPPeer struct {
-	conn     net.Conn
+	net.Conn
 	outbount bool
 }
 
@@ -34,7 +34,7 @@ type TCPTransport struct {
 func NewTCPPeer(conn net.Conn, outbount bool) *TCPPeer {
 
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbount: outbount,
 	}
 }
@@ -60,8 +60,17 @@ func (p *TCPTransport) Close() error {
 	return p.listner.Close()
 }
 
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
+// func (p *TCPPeer) Close() error {
+// 	return p.conn.Close()
+// }
+
+// func (p *TCPPeer) RemoteAdder() net.Addr {
+// 	return p.conn.RemoteAddr()
+// }
+
+func (p *TCPPeer) Send(b []byte) error {
+	_, err := p.Conn.Write(b)
+	return err
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
@@ -86,28 +95,29 @@ func (t *TCPTransport) StartAcceptingLoop() error {
 		}
 		if err != nil {
 			fmt.Printf("TCP accept error: %s\n", err)
+			continue
 			// return err
 		}
 		// if err = t.HandShakeFunc(conn) ; err != nil{
 
 		// }
 		// fmt.Println("Accepted a new connection")
-		go t.HandleConnection(conn)
+		go t.HandleConnection(conn, false)
 
 	}
 }
-func (t *TCPTransport) HandleConnection(conn net.Conn) {
+func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 	var err error
-	peer := NewTCPPeer(conn, true)
-	fmt.Printf("New incoming connection from %v\n", peer)
-
+	// fmt.Printf("New incoming connection from %v to %v\n", conn.RemoteAddr(), conn.LocalAddr())
 	defer func() {
-		fmt.Printf("dropping peer connection: %s", err)
+		fmt.Printf("dropping peer connection: %s\n", err)
 		conn.Close()
 	}()
 
+	peer := NewTCPPeer(conn, outbound)
+
 	if err := t.HandShakeFunc(conn); err != nil {
-		fmt.Printf("Handshake error for connection from %v: %s\n", peer.conn.LocalAddr(), err)
+		fmt.Printf("Handshake error for connection from %v: %s\n", peer.Conn.LocalAddr(), err)
 		conn.Close()
 		return
 	}
@@ -117,15 +127,28 @@ func (t *TCPTransport) HandleConnection(conn net.Conn) {
 			return
 		}
 	}
-	rpc := &RPC{}
+
 	for {
+		rpc := &RPC{}
+		// fmt.Printf("Raw payload bytes: %v\n", rpc.Payload)
+
 		if err := t.Decoder.Decode(conn, rpc); err != nil {
-			fmt.Printf("Error decoding message from %v: %s\n", peer.conn.LocalAddr(), err)
-			// conn.Close()
+			fmt.Printf("Error decoding message from %v: %s\n", peer.Conn.LocalAddr(), err)
+			conn.Close()
 			continue
 		}
 		rpc.From = conn.RemoteAddr()
-		fmt.Printf("message :: %v\n", rpc)
+		fmt.Printf("Raw payload bytes: %v\n", rpc.Payload)
+		fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
 	}
+}
+
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	go t.HandleConnection(conn, true)
+	return nil
 }
