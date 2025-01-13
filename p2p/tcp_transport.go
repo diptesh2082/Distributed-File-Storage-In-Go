@@ -134,7 +134,7 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 
 		if err := t.Decoder.Decode(conn, rpc); err != nil {
 			fmt.Printf("Error decoding message from %v: %s\n", peer.Conn.LocalAddr(), err)
-			conn.Close()
+			// conn.Close()
 			continue
 		}
 		rpc.From = conn.RemoteAddr()

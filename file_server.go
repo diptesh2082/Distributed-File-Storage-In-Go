@@ -55,7 +55,6 @@ type Message struct {
 	Payload any
 }
 
-
 func (s *Server) BroadcastData(p *Payload) error {
 	peers := []io.Writer{}
 	for _, peer := range s.peers {
@@ -66,18 +65,17 @@ func (s *Server) BroadcastData(p *Payload) error {
 		peers = append(peers, peer)
 	}
 	mw := io.MultiWriter(peers...)
-	fmt.Println("Broadcasting")
+	fmt.Println("Broadcasting to", len(peers), "peers:", p)
 	return gob.NewEncoder(mw).Encode(p)
 }
 
 func (s *Server) StoreData(key string, r io.Reader) error {
 	buf := new(bytes.Buffer)
-	tee := io.TeeReader(r,buf)
+	tee := io.TeeReader(r, buf)
 
 	if err := s.store.Write(key, tee); err != nil {
 		return err
 	}
-
 
 	_, err := io.Copy(buf, r)
 	if err != nil {
@@ -106,7 +104,7 @@ func (s *Server) loop() {
 			// handle incoming messages from transport
 			// msg := <-s.Transport.Consume()
 			var p Payload
-			fmt.Println("-------------------",msg.Payload)
+			fmt.Println("-------------------", msg.Payload)
 
 			if err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p.data); err != nil {
 				log.Printf("Error decoding payload: %s. Payload: %v", err, msg.Payload) // Log the error with payload
@@ -144,7 +142,6 @@ func (s *Server) Start() error {
 func (s *Server) Stop() {
 	close(s.quitech)
 }
-
 
 func (s *Server) BootstrapNetwork() error {
 	for _, adder := range s.BootstrapNodes {

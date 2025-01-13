@@ -38,7 +38,7 @@ func makeServer(ListnerAdder string, nodes ...string) *Server {
 
 func main() {
 
-	fileServer1 := makeServer(":3000" ,":4000")
+	fileServer1 := makeServer(":3000" )
 	fileServer2 := makeServer(":4000", ":3000")
 	// go func ()  {
 	// 	time.Sleep(3 * time.Second)
@@ -46,17 +46,17 @@ func main() {
 	// }()
 
 	go func() {
-		log.Fatal(fileServer2.Start())
+		log.Fatal(fileServer1.Start())
 	}()
 	time.Sleep(1 * time.Second)
 	go func() {
-		log.Fatal(fileServer1.Start())
+		log.Fatal(fileServer2.Start())
 	}()
 	time.Sleep(1 * time.Second)
 	data := bytes.NewReader([]byte("This is my  big file"))
 	err := fileServer2.StoreData("mysecretdata", data)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("error :: ",err)
 	}
 	select {}
 }
