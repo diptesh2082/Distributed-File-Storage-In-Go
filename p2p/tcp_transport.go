@@ -141,10 +141,12 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 
 		rpc.From = conn.RemoteAddr().String()
 		peer.Wg.Add(1)
-		fmt.Printf("Raw payload bytes: %v\n", rpc.Payload)
+		// fmt.Printf("Raw payload bytes: %v\n", string(rpc.Payload))
 		// fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
 		peer.Wg.Wait()
+		fmt.Printf("stream ended :: %s", conn.RemoteAddr())
+
 	}
 }
 

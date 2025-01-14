@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	// "time"
-
 	"github.com/diptesh/filestore/p2p"
 )
 
@@ -36,7 +34,8 @@ func makeServer(ListnerAdder string, nodes ...string) *Server {
 }
 
 func main() {
-
+	key := "mysecretdata"
+	// key2 := "mysecretdatax"
 	fileServer1 := makeServer(":3000")
 	fileServer2 := makeServer(":4000", ":3000")
 	// go func ()  {
@@ -54,10 +53,24 @@ func main() {
 	go fileServer1.Start()
 	go fileServer2.Start()
 	time.Sleep(1 * time.Second)
+
 	data := bytes.NewReader([]byte("This is my  big file"))
-	err := fileServer2.StoreData("mysecretdata", data)
+	err := fileServer2.StoreData(key, data)
 	if err != nil {
 		fmt.Println("error :: ", err)
 	}
+
+	// r, err := fileServer2.GetData(key)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// b, err := ioutil.ReadAll(r)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// fmt.Println(string(b))
+
 	select {}
 }
