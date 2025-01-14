@@ -52,25 +52,23 @@ func main() {
 	// }()
 	go fileServer1.Start()
 	go fileServer2.Start()
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
 
-	data := bytes.NewReader([]byte("This is my  big file"))
-	err := fileServer2.StoreData(key, data)
-	if err != nil {
-		fmt.Println("error :: ", err)
+
+	// data := bytes.NewReader([]byte("This is my  big file"))
+
+	for i := 0; i < 10; i++ {
+		data := bytes.NewReader([]byte(fmt.Sprintf("This is my  big file %s" , i)))
+		err := fileServer2.StoreData(fmt.Sprintf("%s%s" , key,i), data)
+		if err != nil {
+			fmt.Println("error :: ", err)
+		}
+		time.Sleep(100 * time.Millisecond)
+
+
 	}
 
-	// r, err := fileServer2.GetData(key)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 
-	// b, err := ioutil.ReadAll(r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// fmt.Println(string(b))
 
 	select {}
 }

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	// "time"
 )
 
 type TCPPeer struct {
 	net.Conn
 	outbount bool
-	Wg       sync.WaitGroup
+	wg       sync.WaitGroup
 }
 
 // // Add a String method to TCPPeer
@@ -86,6 +87,10 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
+func (p *TCPPeer)CloseStream(){
+	p.wg.Done()
+}
+
 func (t *TCPTransport) StartAcceptingLoop() error {
 	for {
 		// fmt.Println("Accepted a new connection")
@@ -136,15 +141,26 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 		if err := t.Decoder.Decode(conn, rpc); err != nil {
 			fmt.Printf("Error decoding message from %v: %s\n", peer.Conn.LocalAddr(), err)
 			// conn.Close()
+			return
+		}
+		// time.Sleep(1 * time.Second)
+		fmt.Printf("Streaming to peer %v started ", rpc.Stream)
+
+		rpc.From = conn.RemoteAddr().String()
+
+		if rpc.Stream {
+			peer.wg.Add(1)
+			fmt.Printf("Streaming to peer %s started ", peer.Conn.RemoteAddr())
+			peer.wg.Wait()
+			fmt.Printf("Streaming ended to peer %s ", peer.Conn.RemoteAddr())
 			continue
 		}
 
-		rpc.From = conn.RemoteAddr().String()
-		peer.Wg.Add(1)
+		// peer.Wg.Add(1)
 		// fmt.Printf("Raw payload bytes: %v\n", string(rpc.Payload))
 		// fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
-		peer.Wg.Wait()
+		// peer.Wg.Wait()
 		fmt.Printf("stream ended :: %s", conn.RemoteAddr())
 
 	}

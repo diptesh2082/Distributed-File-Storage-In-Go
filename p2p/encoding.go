@@ -25,7 +25,7 @@ func (dec *DefaultDecoder) Decode(r io.Reader, msg *RPC) error {
 		return nil
 	}
 
-	stream := peekBuf[0] == byte(IncomingStream)
+	stream := peekBuf[0] ==  IncomingStream
 	if stream {
 		msg.Stream = true
 		return nil

@@ -2,7 +2,7 @@ package p2p
 
 // import "net"
 
-var (
+const (
 	IncomingMessage = 0x1
 	IncomingStream  = 0x2
 )

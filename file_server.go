@@ -70,16 +70,19 @@ func (s *Server) Stream(msg *Message) error {
 func (s *Server) Broadcast(msg *Message) error {
 	bufMsg := new(bytes.Buffer)
 	if err := gob.NewEncoder(bufMsg).Encode(msg); err != nil {
-		log.Printf("Error encoding message: %s", err)
+		log.Printf("encoding message: %s", err)
 		return err
 	}
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingMessage})
 		if err := peer.Send(bufMsg.Bytes()); err != nil {
 			return err
 		}
 
 	}
+	// log.Printf("Error encoding message: %s", msg.Payload)
+
 	return nil
 }
 
@@ -102,10 +105,11 @@ func (s *Server) GetData(key string) (io.Reader, error) {
 		return nil, err
 	}
 
-	time.Sleep(1 * time.Second)
-	log.Printf("Successfully Stroed bytes to Own Disk 1 ")
+	time.Sleep(100 * time.Millisecond)
+	// log.Printf("Successfully Stroed bytes to Own Disk 1 ")
 
 	for _, peer := range s.peers {
+		// peer.Send([]byte{byte(p2p.IncomingStream)})
 		FileBuffer := new(bytes.Buffer)
 		n, err := io.Copy(FileBuffer, peer)
 		if err != nil {
@@ -141,16 +145,22 @@ func (s *Server) StoreData(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(100 * time.Millisecond)
+	log.Printf("encoding message 2 : %s", msg.Payload)
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingStream})
 		n, err := io.Copy(peer, FileBuffer)
 		if err != nil {
 			log.Printf("Error copying data to peer: %s", err)
+			return err
 		}
 		log.Printf("Successfully Stroed %d bytes to Own Disk", n)
-
+		// peer.(*p2p.TCPPeer).Wg.Done()
 	}
+
+	// log.Printf("Successfully Stroed %d bytes to Own Disk", tee)
+
 	return nil
 }
 
@@ -226,7 +236,7 @@ func (s *Server) HandleMessageStoreFile(from string, msg MessageStoreFile) error
 		return err
 	}
 	log.Printf("Successfully Stroed %d bytes to peer", n)
-	peer.(*p2p.TCPPeer).Wg.Done()
+	peer.CloseStream()
 	return nil
 }
 
