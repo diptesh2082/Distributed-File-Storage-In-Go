@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -69,6 +70,8 @@ func (s *Server) Stream(msg *Message) error {
 
 func (s *Server) Broadcast(msg *Message) error {
 	bufMsg := new(bytes.Buffer)
+	log.Printf("Error encoding message: %s", msg.Payload)
+
 	if err := gob.NewEncoder(bufMsg).Encode(msg); err != nil {
 		log.Printf("encoding message: %s", err)
 		return err
@@ -81,20 +84,23 @@ func (s *Server) Broadcast(msg *Message) error {
 		}
 
 	}
-	// log.Printf("Error encoding message: %s", msg.Payload)
+	log.Printf("Error encoding message: %s", msg.Payload)
 
 	return nil
 }
 
 func (s *Server) GetData(key string) (io.Reader, error) {
-	if !s.store.Exists(key) {
-		return nil, errors.New("key does not exist")
-		// log.Printf("Data  not avaible in the the disk")
+	if s.store.Exists(key) {
+		fmt.Printf("[%s] serving file (%s) from local disk\n", s.Transport.Addr(), key)
+		_, r, err := s.store.Read(key)
+		return r, err
 	}
-	r, err := s.store.Read(key)
-	if err != nil {
-		return nil, err
-	}
+	fmt.Printf("[%s] dont have file (%s) locally, fetching from network...\n", s.Transport.Addr(), key)
+
+	// r, err := s.store.Read(key)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	msg := Message{
 		Payload: MessageGetFile{
 			Key: key,
@@ -104,24 +110,28 @@ func (s *Server) GetData(key string) (io.Reader, error) {
 		log.Printf("Error broadcasting message: %s", err)
 		return nil, err
 	}
+	log.Printf("Error encoding message: %s\n", msg.Payload)
 
 	time.Sleep(100 * time.Millisecond)
 	// log.Printf("Successfully Stroed bytes to Own Disk 1 ")
 
 	for _, peer := range s.peers {
 		// peer.Send([]byte{byte(p2p.IncomingStream)})
-		FileBuffer := new(bytes.Buffer)
-		n, err := io.Copy(FileBuffer, peer)
-		if err != nil {
-			log.Printf("Error copying data to peer: %s", err)
-		}
-		log.Printf("Successfully Stroed %d bytes to Own Disk", n)
+		var fileSize int64
+		binary.Read(peer, binary.LittleEndian, &fileSize)
 
+		n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Printf("[%s] received (%d) bytes over the network from (%s)", s.Transport.Addr(), n, peer.RemoteAddr())
+
+		peer.CloseStream()
 	}
 	log.Printf("Successfully Stroed bytes to Own Disk 2")
-
-	select {}
-	return r, nil
+	_, r, err := s.store.Read(key)
+	return r, err
 }
 
 func (s *Server) StoreData(key string, r io.Reader) error {
@@ -205,22 +215,32 @@ func (s *Server) HandleMessageGetFile(from string, msg MessageGetFile) error {
 		log.Printf("Ready to get the files from the disk")
 		return errors.New("key does not exist")
 	}
-	r, err := s.store.Read(msg.Key)
+	fmt.Printf("[%s] serving file (%s) over the network\n", s.Transport.Addr(), msg.Key)
+
+	fileSize, r, err := s.store.Read(msg.Key)
 	if err != nil {
 		log.Printf("Error reading file: %s", err)
 		return err
+	}
+
+	if rc,ok:=r.(io.ReadCloser); ok{
+		fmt.Printf("closing readCloser")
+		defer rc.Close()
 	}
 
 	peer, ok := s.peers[from]
 	if !ok {
 		return fmt.Errorf("peer %s not in peer map", from)
 	}
+	peer.Send([]byte{p2p.IncomingStream})
+
+	binary.Write(peer, binary.LittleEndian, fileSize)
 	n, err := io.Copy(peer, r)
 	if err != nil {
 		log.Printf("Error copying data to peer: %s", err)
-		return nil
+		return err
 	}
-	log.Printf("Successfully sent %d bytes to peer", n)
+	fmt.Printf("[%s] written (%d) bytes over the network to %s\n", s.Transport.Addr(), n, from)
 	return nil
 }
 

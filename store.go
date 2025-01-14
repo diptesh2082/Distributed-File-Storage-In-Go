@@ -1,9 +1,10 @@
 package main
 
 import (
-	"bytes"
+	// "bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -78,17 +79,12 @@ func (p PathKey) GetTheFirstPath() string {
 	return paths[0]
 }
 
-func (s *Store) Exists(key string) (bool) {
-	pathkey := s.PathTransFormFunc(key)
-	pathAndFileName := s.Root + "/" + pathkey.FullPath()
+func (s *Store) Exists(key string) bool {
+	pathKey := s.PathTransFormFunc(key)
+	pathAndFileName := s.Root + "/" + pathKey.FullPath()
+
 	_, err := os.Stat(pathAndFileName)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-		return false
-	}
-	return true
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (s *Store) Clear(key string) error {
@@ -105,46 +101,54 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(pathAndFileName)
 }
 
-func (s *Store) Read(key string) (io.Reader, error) {
-	f, err := s.readStream(key)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, f)
+func (s *Store) Read(key string) (int64, io.Reader, error) {
+	// n, f, err := s.readStream(key)
+	// if err != nil {
+	// 	return n, nil, err
+	// }
+	// defer f.Close()
+	// buf := new(bytes.Buffer)
+	// _, err = io.Copy(buf, f)
 
-	return buf, err
+	return s.readStream(key)
 }
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
-func (s *Store) readStream(key string) (*os.File, error) {
+func (s *Store) readStream(key string) (int64, *os.File, error) {
 	PathKey := s.PathTransFormFunc(key)
 	fullPathAndFileNameWithRoot := s.Root + "/" + PathKey.FullPath()
-	return os.Open(fullPathAndFileNameWithRoot)
+	file, err := os.Open(fullPathAndFileNameWithRoot)
+	if err != nil {
+		return 0, nil, err
+	}
+	fi, err := file.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+	return fi.Size(), file, nil
 }
 
 func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathkey := s.PathTransFormFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return 0,err
+		return 0, err
 	}
 	// filename := "somefile"
 	fullPathAndFileNameWithRoot := s.Root + "/" + pathkey.FullPath()
 
 	f, err := os.Create(fullPathAndFileNameWithRoot)
 	if err != nil {
-		return 0,nil
+		return 0, nil
 	}
 	defer f.Close()
 
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return 0,err
+		return 0, err
 	}
 	log.Printf("Wrote %d bytes to file %s", n, fullPathAndFileNameWithRoot)
-	return n ,nil
+	return n, nil
 }

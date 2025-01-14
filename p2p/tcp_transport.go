@@ -150,7 +150,7 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 			return
 		}
 		// time.Sleep(1 * time.Second)
-		fmt.Printf("Streaming to peer %v started ", rpc.Stream)
+		fmt.Printf("Streaming to peer %v started\n ", rpc.Stream)
 
 		rpc.From = conn.RemoteAddr().String()
 
@@ -167,7 +167,7 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 		// fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
 		// peer.Wg.Wait()
-		fmt.Printf("stream ended :: %s", conn.RemoteAddr())
+		fmt.Printf("stream ended :: %s\n", conn.RemoteAddr())
 
 	}
 }

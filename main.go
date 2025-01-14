@@ -52,6 +52,7 @@ func main() {
 	// 	log.Fatal(fileServer2.Start())
 	// }()
 	go fileServer1.Start()
+	time.Sleep(100 * time.Millisecond)
 	go fileServer2.Start()
 	time.Sleep(100 * time.Millisecond)
 
@@ -79,5 +80,5 @@ func main() {
 
 	fmt.Println(string(b))
 
-	select {}
+	// select {}
 }

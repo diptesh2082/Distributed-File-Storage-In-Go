@@ -56,13 +56,13 @@ func TestStore(t *testing.T) {
 			t.Error(err)
 		}
 
-		r, err := s.Read(key)
+		n , r, err := s.Read(key)
 		if err != nil {
 			t.Error(err)
 		}
 
 		b, _ := ioutil.ReadAll(r)
-		log.Printf("Read data: %s", b)
+		log.Printf("Read data: %s", n)
 		if string(b) != string(data) {
 			t.Errorf("have %s got %s", data, b)
 		}
