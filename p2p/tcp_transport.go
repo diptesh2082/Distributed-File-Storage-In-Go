@@ -20,7 +20,7 @@ type TCPPeer struct {
 //		return p.conn.RemoteAddr().String() // This will print the remote address of the connection
 //	}
 type TCPTransportOpts struct {
-	ListnerAdder  string
+	ListnerAddr   string
 	HandShakeFunc HandShakeFunc
 	Decoder       Decoder
 	OnPeer        func(Peer) error
@@ -77,7 +77,7 @@ func (p *TCPPeer) Send(b []byte) error {
 
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
-	t.listner, err = net.Listen("tcp", t.ListnerAdder)
+	t.listner, err = net.Listen("tcp", t.ListnerAddr)
 	if err != nil {
 		return err
 	}
@@ -87,8 +87,14 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
-func (p *TCPPeer)CloseStream(){
+func (p *TCPPeer) CloseStream() {
 	p.wg.Done()
+}
+
+// Addr implements the Transport interface return the address
+// the transport is accepting connections.
+func (t *TCPTransport) Addr() string {
+	return t.ListnerAddr
 }
 
 func (t *TCPTransport) StartAcceptingLoop() error {

@@ -15,5 +15,6 @@ type Transport interface {
 	Consume() <-chan RPC
 	Close() error
 	Dial(addr string) error
+	Addr() string
 	// RemoteAdder() net.Addr
 }

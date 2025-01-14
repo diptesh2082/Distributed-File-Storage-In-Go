@@ -1,8 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"time"
 
 	"github.com/diptesh/filestore/p2p"
@@ -15,7 +16,7 @@ func OnPeer(peer p2p.Peer) error {
 }
 func makeServer(ListnerAdder string, nodes ...string) *Server {
 	TCPTransportOpts := p2p.TCPTransportOpts{
-		ListnerAdder:  ListnerAdder,
+		ListnerAddr:   ListnerAdder,
 		HandShakeFunc: p2p.NOPHandShake,
 		Decoder:       &p2p.DefaultDecoder{},
 		OnPeer:        OnPeer,
@@ -34,8 +35,8 @@ func makeServer(ListnerAdder string, nodes ...string) *Server {
 }
 
 func main() {
-	key := "mysecretdata"
-	// key2 := "mysecretdatax"
+	// key := "mysecretdata"
+	key1 := "coolpicture.jpg"
 	fileServer1 := makeServer(":3000")
 	fileServer2 := makeServer(":4000", ":3000")
 	// go func ()  {
@@ -54,21 +55,29 @@ func main() {
 	go fileServer2.Start()
 	time.Sleep(100 * time.Millisecond)
 
+	//
+	// data := bytes.NewReader([]byte("This is my picture file"))
 
-	// data := bytes.NewReader([]byte("This is my  big file"))
+	// for i := 0; i < 1; i++ {
+	// 	// data := bytes.NewReader([]byte(fmt.Sprintf("This is my  big file %s" , i)))
+	// 	err := fileServer2.StoreData(key1, data)
+	// 	if err != nil {
+	// 		fmt.Println("error :: ", err)
+	// 	}
+	// 	time.Sleep(100 * time.Millisecond)
 
-	for i := 0; i < 10; i++ {
-		data := bytes.NewReader([]byte(fmt.Sprintf("This is my  big file %s" , i)))
-		err := fileServer2.StoreData(fmt.Sprintf("%s%s" , key,i), data)
-		if err != nil {
-			fmt.Println("error :: ", err)
-		}
-		time.Sleep(100 * time.Millisecond)
-
-
+	// }
+	r, err := fileServer2.GetData(key1)
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	fmt.Println(string(b))
 
 	select {}
 }

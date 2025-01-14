@@ -9,11 +9,11 @@ import (
 
 func TestTCPTransport(t *testing.T) {
 	tcpopts := TCPTransportOpts{
-		ListnerAdder:  ":4000",
+		ListnerAddr:   ":4000",
 		HandShakeFunc: NOPHandShake,
 		Decoder:       &DefaultDecoder{},
 	}
 	tr := NewTCPTransport(tcpopts)
-	assert.Equal(t, tr.ListnerAdder, ":4000")
+	assert.Equal(t, tr.ListnerAddr, ":4000")
 	assert.Nil(t, tr.ListenAndAccept())
 }
