@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/diptesh/filestore/p2p"
 )
@@ -46,16 +47,17 @@ func NewServer(opts ServerOptes) *Server {
 	}
 }
 
-type Payload struct {
-	key  string
-	data []byte
-}
+// type DataMessage struct {
+// 	key  string
+// 	data []byte
+// }
 
 type Message struct {
+	// From    string
 	Payload any
 }
 
-func (s *Server) BroadcastData(p *Payload) error {
+func (s *Server) BroadcastData(msg *Message) error {
 	peers := []io.Writer{}
 	for _, peer := range s.peers {
 		// if err := peer.Send(p.data); err != nil {
@@ -65,29 +67,38 @@ func (s *Server) BroadcastData(p *Payload) error {
 		peers = append(peers, peer)
 	}
 	mw := io.MultiWriter(peers...)
-	fmt.Println("Broadcasting to", len(peers), "peers:", p)
-	return gob.NewEncoder(mw).Encode(p.data)
+	fmt.Println("Broadcasting to", len(peers), "peers:", &msg)
+	return gob.NewEncoder(mw).Encode(msg)
 }
 
 func (s *Server) StoreData(key string, r io.Reader) error {
+
 	buf := new(bytes.Buffer)
-	tee := io.TeeReader(r, buf)
-
-	if err := s.store.Write(key, tee); err != nil {
-		return err
+	msg := &Message{
+		Payload: []byte("stroagekey"),
 	}
 
-	_, err := io.Copy(buf, r)
-	if err != nil {
+	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
+		log.Printf("Error encoding message: %s", err)
 		return err
 	}
-	p := &Payload{
-		key:  key,
-		data: buf.Bytes(),
+	for _, peer := range s.peers {
+		// peers = append(peers, peer)
+		if err := peer.Send(buf.Bytes()); err != nil {
+			return err
+		}
+
 	}
-	// fmt.Println(buf.Bytes(), "www")
-	// fmt.Println(p.data, "payload")
-	return s.BroadcastData(p)
+	time.Sleep(1 * time.Second)
+	data := []byte("here is my  next big data")
+	for _, peer := range s.peers {
+		// peers = append(peers, peer)
+		if err := peer.Send(data); err != nil {
+			return err
+		}
+
+	}
+	return nil
 }
 
 func (s *Server) loop() {
@@ -100,19 +111,28 @@ func (s *Server) loop() {
 		case <-s.quitech:
 			fmt.Println("-------------------")
 			return
-		case msg := <-s.Transport.Consume():
+		case rpc := <-s.Transport.Consume():
 			// handle incoming messages from transport
 			// msg := <-s.Transport.Consume()
-			var p Payload
-			fmt.Println("-------------------", msg.Payload)
+			var m Message
 
-			if err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p.data); err != nil {
-				log.Printf("Error decoding payload: %s. Payload: %v", err, msg.Payload) // Log the error with payload
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&m); err != nil {
+				log.Printf("Error decoding payload: %s. Payload: %v", err, rpc.Payload) // Log the error with payload
 				log.Fatal(err)
 			}
-			fmt.Printf("Received message: %+v\n", p)
+			fmt.Printf("Received message: %s\n", string(m.Payload.([]byte)))
 			// process message and store in store
 			// ...
+			peer, ok := s.peers[rpc.From]
+			if !ok {
+				panic("peer not found in peer map")
+			}
+			b := make([]byte, 10000)
+			if _, err := peer.Read(b); err != nil {
+				panic(err)
+			}
+			fmt.Printf("Received message for 2nd round: %s\n", string(m.Payload.([]byte)))
+
 		}
 	}
 }

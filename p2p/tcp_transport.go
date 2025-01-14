@@ -10,6 +10,7 @@ import (
 type TCPPeer struct {
 	net.Conn
 	outbount bool
+	Wg       sync.WaitGroup
 }
 
 // // Add a String method to TCPPeer
@@ -137,10 +138,13 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 			// conn.Close()
 			continue
 		}
-		rpc.From = conn.RemoteAddr()
+
+		rpc.From = conn.RemoteAddr().String()
+		peer.Wg.Add(1)
 		fmt.Printf("Raw payload bytes: %v\n", rpc.Payload)
-		fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
+		// fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
+		peer.Wg.Wait()
 	}
 }
 
