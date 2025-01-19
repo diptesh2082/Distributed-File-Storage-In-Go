@@ -57,9 +57,6 @@ Welcome to FileStore, a powerful distributed file storage system built in Go tha
 - **Enhanced Discovery**: Implement more sophisticated peer discovery mechanisms
 - **Contributing**: We welcome contributions! Please see our contributing guidelines.
 
-## 📄 License
-
-This project is licensed under the MIT License - see below for details:
 
 ## 🏗️ Architecture
 
@@ -81,3 +78,7 @@ FileStore uses a distributed architecture with the following key components:
 - Coordinates storage and network operations
 
 ### High-Level Architecture Diagram
+### License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details. Feel free to use, modify, and distribute this software as per the terms of the MIT License.
+
