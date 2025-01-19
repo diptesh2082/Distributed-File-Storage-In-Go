@@ -47,36 +47,35 @@ func TestCASPathTransFormFunc(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	s := newStore()
-
+	ID := generateID()
 	defer tearDown(t, s)
 	for i := 0; i <= 50; i++ {
 		key := "Dx" + fmt.Sprint(i)
+		// ID := generateID()
 		data := []byte("some image in byte")
-		if _ , err := s.Write(key, bytes.NewReader(data)); err != nil {
+		if _, err := s.writeStream(ID, key, bytes.NewReader(data)); err != nil {
 			t.Error(err)
 		}
-
-		n , r, err := s.Read(key)
+		if ok := s.Exists(ID, key); !ok {
+			t.Errorf("expected to have key %s", key)
+		}
+		n, r, err := s.Read(ID, key)
 		if err != nil {
 			t.Error(err)
 		}
 
 		b, _ := ioutil.ReadAll(r)
-		log.Printf("Read data: %s", n)
+		log.Printf("Read data: %d", n)
 		if string(b) != string(data) {
 			t.Errorf("have %s got %s", data, b)
 		}
 
-		if err := s.Delete(key); err != nil {
+		if err := s.Delete(ID, key); err != nil {
 			t.Error(err)
 		}
 
-		exists := s.Exists(key)
-		if err != nil {
-			t.Error(err)
-		}
-		if exists {
-			t.Errorf("file %s should not exist after deletion", key)
+		if ok := s.Exists(ID, key); !ok {
+			t.Errorf("expected to have key %s", key)
 		}
 	}
 	// log.Printf("Read data: %s", b)

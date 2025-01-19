@@ -14,26 +14,33 @@ import (
 	"github.com/diptesh/filestore/p2p"
 )
 
+// ServerOptes contains configuration options for the file server
 type ServerOptes struct {
-	PathTransFormFunc PathTransFormFunc
-	StorageRoot       string
-	Transport         p2p.Transport
-	BootstrapNodes    []string
+	ID                string
+	PathTransFormFunc PathTransFormFunc // Function to transform file paths
+	StorageRoot       string            // Root directory for file storage
+	Transport         p2p.Transport     // Network transport layer
+	BootstrapNodes    []string          // List of bootstrap node addresses
+	EncKey            []byte            // Encryption key for file encryption/decryption
 }
 
+// Server represents the main file server instance
 type Server struct {
 	ServerOptes
-	store    *Store
-	quitech  chan struct{}
-	peerLock sync.Mutex
-	peers    map[string]p2p.Peer
+	store    *Store              // File storage backend
+	quitech  chan struct{}       // Channel for shutdown signaling
+	peerLock sync.Mutex          // Mutex for peer map access
+	peers    map[string]p2p.Peer // Map of connected peers
 }
 
+// NewServer creates and initializes a new Server instance
 func NewServer(opts ServerOptes) *Server {
-
 	storeOptes := StoreOptes{
 		Root:              opts.StorageRoot,
 		PathTransFormFunc: opts.PathTransFormFunc,
+	}
+	if len(opts.ID) == 0 {
+		opts.ID = generateID()
 	}
 	return &Server{
 		ServerOptes: opts,
@@ -43,37 +50,41 @@ func NewServer(opts ServerOptes) *Server {
 	}
 }
 
+// MessageStoreFile represents a file storage message
 type MessageStoreFile struct {
+	ID string
 	Key  string
 	Size int64
 }
 
+// MessageGetFile represents a file retrieval message
 type MessageGetFile struct {
+	ID string
 	Key string
-	// Size int64
 }
 
+// Message represents a generic message with a payload
 type Message struct {
-	// From    string
 	Payload any
 }
 
+// Stream sends a message to all connected peers using a MultiWriter
 func (s *Server) Stream(msg *Message) error {
 	peers := []io.Writer{}
 	for _, peer := range s.peers {
 		peers = append(peers, peer)
 	}
 	mw := io.MultiWriter(peers...)
-	// fmt.Println("Broadcasting to", len(peers), "peers:", &msg)
 	return gob.NewEncoder(mw).Encode(msg)
 }
 
+// Broadcast sends a message to all connected peers individually
 func (s *Server) Broadcast(msg *Message) error {
 	bufMsg := new(bytes.Buffer)
-	log.Printf("Error encoding message: %s", msg.Payload)
+	log.Printf("Incoming encoding message: %v", msg.Payload)
 
 	if err := gob.NewEncoder(bufMsg).Encode(msg); err != nil {
-		log.Printf("encoding message: %s", err)
+		log.Printf("Error encoding message: %v", err)
 		return err
 	}
 
@@ -82,28 +93,23 @@ func (s *Server) Broadcast(msg *Message) error {
 		if err := peer.Send(bufMsg.Bytes()); err != nil {
 			return err
 		}
-
 	}
-	log.Printf("Error encoding message: %s", msg.Payload)
-
 	return nil
 }
 
+// GetData retrieves file data either from local storage or from the network
 func (s *Server) GetData(key string) (io.Reader, error) {
-	if s.store.Exists(key) {
+	if s.store.Exists(s.ID, key) {
 		fmt.Printf("[%s] serving file (%s) from local disk\n", s.Transport.Addr(), key)
-		_, r, err := s.store.Read(key)
+		_, r, err := s.store.Read(s.ID, key)
 		return r, err
 	}
 	fmt.Printf("[%s] dont have file (%s) locally, fetching from network...\n", s.Transport.Addr(), key)
 
-	// r, err := s.store.Read(key)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	msg := Message{
 		Payload: MessageGetFile{
-			Key: key,
+			ID: s.ID,
+			Key: hashKey(key),
 		},
 	}
 	if err := s.Broadcast(&msg); err != nil {
@@ -113,14 +119,13 @@ func (s *Server) GetData(key string) (io.Reader, error) {
 	log.Printf("Error encoding message: %s\n", msg.Payload)
 
 	time.Sleep(100 * time.Millisecond)
-	// log.Printf("Successfully Stroed bytes to Own Disk 1 ")
 
 	for _, peer := range s.peers {
-		// peer.Send([]byte{byte(p2p.IncomingStream)})
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
+		log.Printf("Successfully Stored %d bytes to Own Disk 1 ", fileSize)
 
-		n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
+		n, err := s.store.WriteDecrypt(s.EncKey, s.ID, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -129,51 +134,54 @@ func (s *Server) GetData(key string) (io.Reader, error) {
 
 		peer.CloseStream()
 	}
-	log.Printf("Successfully Stroed bytes to Own Disk 2")
-	_, r, err := s.store.Read(key)
+	_, r, err := s.store.Read(s.ID, key)
 	return r, err
 }
 
+// StoreData stores file data locally and broadcasts it to peers
 func (s *Server) StoreData(key string, r io.Reader) error {
 	var (
-		FileBuffer = new(bytes.Buffer)
-		tee        = io.TeeReader(r, FileBuffer)
+		fileBuffer = new(bytes.Buffer)
+		tee        = io.TeeReader(r, fileBuffer)
 	)
-	size, err := s.store.Write(key, tee)
+	size, err := s.store.Write(s.ID, key, tee)
 	if err != nil {
 		return err
 	}
+	log.Printf("Wrote %d bytes to file %s", size, s.StorageRoot)
 	msg := Message{
 		Payload: MessageStoreFile{
-			Key:  key,
-			Size: size,
+			ID: s.ID,
+			Key:  hashKey(key),
+			Size: size + 16,
 		},
 	}
 
 	if err := s.Broadcast(&msg); err != nil {
-		log.Printf("Error encoding message: %s", err)
+		log.Printf("Error encoding message: %v", err)
 		return err
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	log.Printf("encoding message 2 : %s", msg.Payload)
+	log.Printf("encoding message 2 : %v", msg.Payload)
 
+	peers := []io.Writer{}
 	for _, peer := range s.peers {
-		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, FileBuffer)
-		if err != nil {
-			log.Printf("Error copying data to peer: %s", err)
-			return err
-		}
-		log.Printf("Successfully Stroed %d bytes to Own Disk", n)
-		// peer.(*p2p.TCPPeer).Wg.Done()
+		peers = append(peers, peer)
+	}
+	mw := io.MultiWriter(peers...)
+	mw.Write([]byte{p2p.IncomingStream})
+	n, err := copyEncrypt(s.EncKey, fileBuffer, mw)
+	if err != nil {
+		return err
 	}
 
-	// log.Printf("Successfully Stroed %d bytes to Own Disk", tee)
+	fmt.Printf("[%s] received and written (%d) bytes to disk\n", s.Transport.Addr(), n)
 
 	return nil
 }
 
+// loop runs the main server event loop
 func (s *Server) loop() {
 	defer func() {
 		log.Printf("Server shutting down...\n")
@@ -184,14 +192,10 @@ func (s *Server) loop() {
 		case <-s.quitech:
 			return
 		case rpc := <-s.Transport.Consume():
-
 			var msg Message
-
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
-				log.Printf("Error decoding payload: %s. Payload: %v", err, rpc.Payload) // Log the error with payload
-				// log.Fatal(err)
+				log.Printf("Error decoding payload: %s. Message: %v", err, rpc)
 			}
-
 			if err := s.HandleMessage(rpc.From, &msg); err != nil {
 				log.Printf("Error handling message: %s", err)
 			}
@@ -199,6 +203,7 @@ func (s *Server) loop() {
 	}
 }
 
+// HandleMessage routes messages to appropriate handlers based on payload type
 func (s *Server) HandleMessage(from string, msg *Message) error {
 	switch v := msg.Payload.(type) {
 	case MessageStoreFile:
@@ -209,21 +214,21 @@ func (s *Server) HandleMessage(from string, msg *Message) error {
 	return nil
 }
 
+// HandleMessageGetFile handles file retrieval requests from peers
 func (s *Server) HandleMessageGetFile(from string, msg MessageGetFile) error {
-	// fmt.Printf("Received message in HandleMessageGetFile : %v\n", (msg))
-	if !s.store.Exists(msg.Key) {
+	if !s.store.Exists(msg.ID, msg.Key) {
 		log.Printf("Ready to get the files from the disk")
 		return errors.New("key does not exist")
 	}
 	fmt.Printf("[%s] serving file (%s) over the network\n", s.Transport.Addr(), msg.Key)
 
-	fileSize, r, err := s.store.Read(msg.Key)
+	fileSize, r, err := s.store.Read(msg.ID, msg.Key)
 	if err != nil {
 		log.Printf("Error reading file: %s", err)
 		return err
 	}
 
-	if rc,ok:=r.(io.ReadCloser); ok{
+	if rc, ok := r.(io.ReadCloser); ok {
 		fmt.Printf("closing readCloser")
 		defer rc.Close()
 	}
@@ -244,32 +249,31 @@ func (s *Server) HandleMessageGetFile(from string, msg MessageGetFile) error {
 	return nil
 }
 
+// HandleMessageStoreFile handles file storage requests from peers
 func (s *Server) HandleMessageStoreFile(from string, msg MessageStoreFile) error {
-	// fmt.Printf("Received message in HandleMessageStoreFile : %v\n", (msg))
 	peer, ok := s.peers[from]
 	if !ok {
 		panic("peer not found in peer map")
 	}
-	n, err := s.store.Write(msg.Key, io.LimitReader(peer, msg.Size))
+	n, err := s.store.Write(msg.ID, msg.Key, io.LimitReader(peer, msg.Size))
 	if err != nil {
-		// panic(err)
 		return err
 	}
-	log.Printf("Successfully Stroed %d bytes to peer", n)
+	log.Printf("Successfully Stored %d bytes to peer", n)
 	peer.CloseStream()
 	return nil
 }
 
+// OnPeer handles new peer connections
 func (s *Server) OnPeer(p p2p.Peer) error {
-	// function body
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
 	s.peers[p.RemoteAddr().String()] = p
 	log.Printf("New peer connected from %s", p.RemoteAddr().String())
-
 	return nil
 }
 
+// Start initializes and starts the file server
 func (s *Server) Start() error {
 	log.Printf("Starting file server on %s...\n", s.StorageRoot)
 	if err := s.Transport.ListenAndAccept(); err != nil {
@@ -282,29 +286,31 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// Stop gracefully shuts down the server
 func (s *Server) Stop() {
 	close(s.quitech)
 }
 
+// BootstrapNetwork connects to initial bootstrap nodes
 func (s *Server) BootstrapNetwork() error {
-	for _, adder := range s.BootstrapNodes {
-		log.Printf("Tried to dial %s: %s\n", adder, adder)
-		if len(adder) == 0 {
+	for _, addr := range s.BootstrapNodes {
+		log.Printf("Tried to dial %s: %s\n", addr, addr)
+		if len(addr) == 0 {
 			continue
 		}
-		go func(adder string) {
-			err := s.Transport.Dial(adder)
+		go func(addr string) {
+			err := s.Transport.Dial(addr)
 			if err != nil {
-				log.Printf("Failed to dial %s: %s\n", adder, err)
-				// return
+				log.Printf("Failed to dial %s: %s\n", addr, err)
 			} else {
-				log.Printf("Successfully dialed %s\n", adder)
+				log.Printf("Successfully dialed %s\n", addr)
 			}
-		}(adder)
+		}(addr)
 	}
 	return nil
 }
 
+// init registers message types with gob encoder
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})

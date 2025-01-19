@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+const defaultRootFolderName = "Dipnetwork"
 func CASPathTransFormFunc(key string) PathKey {
 	hash := sha1.Sum([]byte(key))
 
@@ -43,6 +44,7 @@ type PathKey struct {
 type StoreOptes struct {
 	PathTransFormFunc PathTransFormFunc
 	Root              string
+	// ID                string
 }
 
 var DefaultPathTransFormFunc = func(key string) PathKey {
@@ -61,8 +63,9 @@ func NewStore(opts StoreOptes) *Store {
 		opts.PathTransFormFunc = DefaultPathTransFormFunc
 	}
 	if len(opts.Root) == 0 {
-		opts.Root = "dipteshcomp"
+		opts.Root = defaultRootFolderName
 	}
+
 	return &Store{
 		StoreOptes: opts,
 	}
@@ -79,9 +82,10 @@ func (p PathKey) GetTheFirstPath() string {
 	return paths[0]
 }
 
-func (s *Store) Exists(key string) bool {
+func (s *Store) Exists(ID,key string) bool {
 	pathKey := s.PathTransFormFunc(key)
-	pathAndFileName := s.Root + "/" + pathKey.FullPath()
+	pathAndFileName := s.Root + "/" + ID + "/" + pathKey.FullPath()
+	fmt.Println("pathAndFileName exist ::: ",pathAndFileName)
 
 	_, err := os.Stat(pathAndFileName)
 	return !errors.Is(err, os.ErrNotExist)
@@ -91,17 +95,18 @@ func (s *Store) Clear(key string) error {
 	return os.RemoveAll(s.Root)
 }
 
-func (s *Store) Delete(key string) error {
+func (s *Store) Delete(ID,key string) error {
 	pathkey := s.PathTransFormFunc(key)
 	defer func() {
-		log.Printf("Deleted file: %s", pathkey.Filename)
+		log.Printf("deleted [%s] from disk", pathkey.Filename)
 	}()
-	pathAndFileName := s.Root + "/" + pathkey.GetTheFirstPath()
+	pathAndFileName := s.Root + "/" + ID + "/" + pathkey.GetTheFirstPath()
+	fmt.Println("pathAndFileName ::: ",pathAndFileName)
 	log.Printf("Deleted file: %s", pathAndFileName)
 	return os.RemoveAll(pathAndFileName)
 }
 
-func (s *Store) Read(key string) (int64, io.Reader, error) {
+func (s *Store) Read(ID,key string) (int64, io.Reader, error) {
 	// n, f, err := s.readStream(key)
 	// if err != nil {
 	// 	return n, nil, err
@@ -110,15 +115,15 @@ func (s *Store) Read(key string) (int64, io.Reader, error) {
 	// buf := new(bytes.Buffer)
 	// _, err = io.Copy(buf, f)
 
-	return s.readStream(key)
+	return s.readStream(ID,key)
 }
-func (s *Store) Write(key string, r io.Reader) (int64, error) {
-	return s.writeStream(key, r)
+func (s *Store) Write(ID , key string, r io.Reader) (int64, error) {
+	return s.writeStream(ID,key, r)
 }
 
-func (s *Store) readStream(key string) (int64, *os.File, error) {
+func (s *Store) readStream(ID,key string) (int64, *os.File, error) {
 	PathKey := s.PathTransFormFunc(key)
-	fullPathAndFileNameWithRoot := s.Root + "/" + PathKey.FullPath()
+	fullPathAndFileNameWithRoot := s.Root + "/" + ID + "/" + PathKey.FullPath()
 	file, err := os.Open(fullPathAndFileNameWithRoot)
 	if err != nil {
 		return 0, nil, err
@@ -129,26 +134,31 @@ func (s *Store) readStream(key string) (int64, *os.File, error) {
 	}
 	return fi.Size(), file, nil
 }
-
-func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
+func (s *Store) openFileForWriting(ID,key string) (*os.File, error) {
 	pathkey := s.PathTransFormFunc(key)
-	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.PathName)
+	pathNameWithRoot := fmt.Sprintf("%s/%s/%s", s.Root, ID, pathkey.PathName)
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return 0, err
+		return nil, err
 	}
 	// filename := "somefile"
-	fullPathAndFileNameWithRoot := s.Root + "/" + pathkey.FullPath()
-
-	f, err := os.Create(fullPathAndFileNameWithRoot)
-	if err != nil {
-		return 0, nil
-	}
-	defer f.Close()
-
-	n, err := io.Copy(f, r)
+	fullPathAndFileNameWithRoot := s.Root + "/" + ID + "/" + pathkey.FullPath()
+	return os.Create(fullPathAndFileNameWithRoot)
+}
+func (s *Store) WriteDecrypt(encKey []byte, ID,key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(ID,key)
 	if err != nil {
 		return 0, err
 	}
-	log.Printf("Wrote %d bytes to file %s", n, fullPathAndFileNameWithRoot)
-	return n, nil
+	n, err := copyDecrypt(encKey, r, f)
+	return int64(n), err
+}
+
+func (s *Store) writeStream(ID,key string, r io.Reader) (int64, error) {
+	f, err := s.openFileForWriting(ID,key)
+	if err != nil {
+		return 0, err
+	}
+	// defer f.Close()
+
+	return io.Copy(f, r)
 }
