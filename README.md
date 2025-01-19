@@ -1,58 +1,64 @@
-# 🔥 TCP Transport Library: Unleash the Power of Connections
+# 🔥 FileStore: Distributed File Storage with P2P Networking
 
-Welcome to the ultimate Go-based library for mastering TCP connections! Dive into a world where managing incoming connections is not just efficient—it's exhilarating. This library is packed with features and optimizations that make it a powerhouse for network communication.
-
+Welcome to FileStore, a powerful distributed file storage system built in Go that leverages peer-to-peer networking for resilient and efficient file management. This project combines robust TCP transport, secure encryption, and content-addressable storage to create a reliable distributed storage solution.
 ## 🌟 Features
 
-- **🚀 TCP Listening**: Launch a TCP server that tunes into your specified address with precision and reliability.
-- **🤝 Connection Handling**: Seamlessly accept and orchestrate incoming TCP connections like a maestro, ensuring smooth data flow.
-- **⚡ Concurrency**: Effortlessly juggle multiple connections with the magic of goroutines, maximizing performance and scalability.
-- **🔒 Secure Communication**: Utilize built-in encryption to keep your data safe and secure during transmission.
-- **🔧 Customizable Options**: Tailor the transport settings to fit your specific needs with flexible configuration options.
+- **📂 Distributed Storage**: Store and retrieve files across a network of peer nodes
+- **🔀 P2P Architecture**: Leverage peer-to-peer networking for improved reliability and scalability
+- **🔒 Built-in Encryption**: AES encryption keeps your files secure during transmission and storage
+- **📍 Content Addressing**: Files are stored using content-addressable storage (CAS) for data integrity
+- **🤝 TCP Transport**: Robust TCP-based transport layer for reliable peer communication
+- **⚡ Concurrent Operations**: Handle multiple peers and file operations simultaneously
+- **🔧 Flexible Configuration**: Customize node behavior, storage paths, and network topology
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Go 1.16 or later—your gateway to greatness.
+- Go 1.16 or later
 
 ### Installation
 
-1. **Clone the Repository**: Start by cloning this repository to your local machine using the following command:
+1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/tcp-transport-library.git
-   cd tcp-transport-library
+   git clone https://github.com/yourusername/filestore.git
+   cd filestore
    ```
 
-2. **Build the Project**: Use the provided Makefile to build the project. This will compile the Go code and create an executable in the `bin` directory.
+2. **Build the Project**:
    ```bash
    make build
    ```
 
-3. **Run the Server**: After building, you can run the server using the following command:
+3. **Run a Node**:
    ```bash
    make run
    ```
 
 ### Usage
 
-- **Running the Example**: The `main.go` file contains an example setup of a TCP server. You can modify the server addresses and options to test different configurations.
-- **Testing**: Run the tests to ensure everything is working correctly:
+- **Starting Multiple Nodes**: The system supports running multiple nodes that automatically discover and connect to each other. See `main.go` for example configurations.
+- **Running Tests**:
   ```bash
   make test
   ```
 
-### Packages Used
+### Core Components
 
-- **net**: For handling network connections.
-- **sync**: To manage concurrency with goroutines.
-- **crypto/aes** and **crypto/cipher**: For encryption and secure data transmission.
-- **io**: For input and output operations.
+- **Store**: Handles local file storage and retrieval
+- **Server**: Manages peer connections and file distribution
+- **TCP Transport**: Provides reliable peer-to-peer communication
+- **Encryption**: Implements secure file storage and transmission
 
-### Extending the Library
+### Extending FileStore
 
-- **Adding New Features**: You can extend the library by implementing additional protocols or enhancing the existing ones. Consider adding support for UDP or WebSocket connections.
-- **Improving Security**: Integrate more advanced encryption algorithms or authentication mechanisms to enhance security.
-- **Contributing**: We welcome contributions! Feel free to fork the repository, make your changes, and submit a pull request.
+- **Custom Storage Backends**: Implement alternative storage backends (S3, etc.)
+- **Additional Protocols**: Add support for different network protocols
+- **Enhanced Discovery**: Implement more sophisticated peer discovery mechanisms
+- **Contributing**: We welcome contributions! Please see our contributing guidelines.
 
-By following these steps, you can harness the full potential of the TCP Transport Library and customize it to suit your networking needs. Happy coding!
+## 📄 License
+
+This project is licensed under the MIT License - see below for details:
+
+## 🏗️ Architecture
