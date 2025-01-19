@@ -62,3 +62,22 @@ Welcome to FileStore, a powerful distributed file storage system built in Go tha
 This project is licensed under the MIT License - see below for details:
 
 ## 🏗️ Architecture
+
+FileStore uses a distributed architecture with the following key components:
+
+### Storage Layer
+- Content-addressable storage (CAS) for efficient file deduplication
+- Encrypted file storage using AES-CTR mode
+- Pluggable storage backend interface
+
+### Network Layer 
+- TCP-based peer-to-peer communication
+- Custom handshake protocol for peer authentication
+- Automatic peer discovery and connection management
+
+### Server Layer
+- Manages peer connections and file distribution
+- Handles file encryption/decryption
+- Coordinates storage and network operations
+
+### High-Level Architecture Diagram
