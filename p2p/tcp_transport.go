@@ -5,76 +5,65 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	// "time"
 )
 
+// TCPPeer represents a peer in the TCP network.
 type TCPPeer struct {
 	net.Conn
-	outbount bool
+	outbound bool
 	wg       sync.WaitGroup
 }
 
-// // Add a String method to TCPPeer
-//
-//	func (p *TCPPeer) String() string {
-//		return p.conn.RemoteAddr().String() // This will print the remote address of the connection
-//	}
+// TCPTransportOpts holds the options for configuring a TCPTransport.
 type TCPTransportOpts struct {
 	ListnerAddr   string
 	HandShakeFunc HandShakeFunc
 	Decoder       Decoder
 	OnPeer        func(Peer) error
 }
+
+// TCPTransport manages the network transport layer for TCP connections.
 type TCPTransport struct {
 	TCPTransportOpts
 	listner net.Listener
 	mu      sync.RWMutex
 	rpcch   chan RPC
-	// peers   map[net.Addr]Peer
 }
 
-func NewTCPPeer(conn net.Conn, outbount bool) *TCPPeer {
-
+// NewTCPPeer creates a new TCPPeer instance.
+func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
-		outbount: outbount,
+		outbound: outbound,
 	}
 }
-
-// type Temp struct{}
 
 // NewTCPTransport creates a new TCPTransport instance.
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
-
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		// peers:            make(map[net.Addr]Peer),
-		mu:    sync.RWMutex{},
-		rpcch: make(chan RPC, 1018),
+		mu:               sync.RWMutex{},
+		rpcch:            make(chan RPC, 1018),
 	}
 }
 
+// Consume returns a channel to receive RPC messages.
 func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcch
 }
 
+// Close closes the TCPTransport listener.
 func (p *TCPTransport) Close() error {
 	return p.listner.Close()
 }
 
-// func (p *TCPPeer) Close() error {
-// 	return p.conn.Close()
-// }
-
-// func (p *TCPPeer) RemoteAdder() net.Addr {
-// 	return p.conn.RemoteAddr()
-// }
-
+// Send sends data over the TCP connection.
 func (p *TCPPeer) Send(b []byte) error {
 	_, err := p.Conn.Write(b)
 	return err
 }
 
+// ListenAndAccept starts listening for incoming connections and accepts them.
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listner, err = net.Listen("tcp", t.ListnerAddr)
@@ -87,42 +76,36 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
+// CloseStream signals that the stream is done.
 func (p *TCPPeer) CloseStream() {
 	p.wg.Done()
 }
 
-// Addr implements the Transport interface return the address
-// the transport is accepting connections.
+// Addr returns the address the transport is accepting connections on.
 func (t *TCPTransport) Addr() string {
 	return t.ListnerAddr
 }
 
+// StartAcceptingLoop continuously accepts incoming connections.
 func (t *TCPTransport) StartAcceptingLoop() error {
 	for {
-		// fmt.Println("Accepted a new connection")
 		conn, err := t.listner.Accept()
-		// fmt.Println("Accepted a new connection")
 		if errors.Is(err, net.ErrClosed) {
 			return nil
 		}
 		if err != nil {
 			fmt.Printf("TCP accept error: %s\n", err)
 			continue
-			// return err
 		}
-		// if err = t.HandShakeFunc(conn) ; err != nil{
-
-		// }
-		// fmt.Println("Accepted a new connection")
 		go t.HandleConnection(conn, false)
-
 	}
 }
+
+// HandleConnection manages a single connection, handling handshakes and message processing.
 func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 	var err error
-	// fmt.Printf("New incoming connection from %v to %v\n", conn.RemoteAddr(), conn.LocalAddr())
 	defer func() {
-		fmt.Printf("dropping peer connection: %s\n", err)
+		fmt.Printf("Dropping peer connection: %s\n", err)
 		conn.Close()
 	}()
 
@@ -142,36 +125,27 @@ func (t *TCPTransport) HandleConnection(conn net.Conn, outbound bool) {
 
 	for {
 		rpc := &RPC{}
-		// fmt.Printf("Raw payload bytes: %v\n", rpc.Payload)
-
 		if err := t.Decoder.Decode(conn, rpc); err != nil {
 			fmt.Printf("Error decoding message from %v: %s\n", peer.Conn.LocalAddr(), err)
-			// conn.Close()
 			return
 		}
-		// time.Sleep(1 * time.Second)
-		fmt.Printf("Streaming to peer %v started\n ", rpc.Stream)
 
 		rpc.From = conn.RemoteAddr().String()
 
 		if rpc.Stream {
 			peer.wg.Add(1)
-			fmt.Printf("Streaming to peer %s started ", peer.Conn.RemoteAddr())
+			fmt.Printf("Streaming to peer %s started\n", peer.Conn.RemoteAddr())
 			peer.wg.Wait()
-			fmt.Printf("Streaming ended to peer %s ", peer.Conn.RemoteAddr())
+			fmt.Printf("Streaming ended to peer %s\n", peer.Conn.RemoteAddr())
 			continue
 		}
 
-		// peer.Wg.Add(1)
-		// fmt.Printf("Raw payload bytes: %v\n", string(rpc.Payload))
-		// fmt.Printf("message :: %v\n %s", rpc, conn.RemoteAddr())
 		t.rpcch <- *rpc
-		// peer.Wg.Wait()
-		fmt.Printf("stream ended :: %s\n", conn.RemoteAddr())
-
+		fmt.Printf("Stream ended :: %s\n", conn.RemoteAddr())
 	}
 }
 
+// Dial connects to a remote address and handles the connection.
 func (t *TCPTransport) Dial(addr string) error {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
